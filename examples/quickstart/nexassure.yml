@@ -1,0 +1,26 @@
+# Quickstart project. Everything here runs against a local DuckDB file,
+# so no credentials and no warehouse are needed.
+#
+#   python seed.py
+#   nexassure run
+version: 1
+project: nexassure-quickstart
+
+metastore:
+  url: sqlite:///nexassure-demo.db
+  auto_discover: true
+
+connections:
+  - name: demo
+    type: duckdb
+    database: ./warehouse.duckdb
+    schema: main
+
+suites:
+  - suites/*.yml
+
+defaults:
+  max_parallel: 8
+
+notifications:
+  notify_on: failure

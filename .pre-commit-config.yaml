@@ -1,0 +1,30 @@
+# Install with:  pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+        exclude: ^examples/.*/suites/
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: nexassure-validate
+        name: Validate NexAssure suites offline
+        entry: nexassure validate --config examples/quickstart/nexassure.yml
+        language: system
+        files: ^examples/quickstart/suites/.*\.ya?ml$
+        pass_filenames: false

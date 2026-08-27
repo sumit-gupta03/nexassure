@@ -1,0 +1,128 @@
+# Connection blocks for every supported engine.
+#
+# Copy the one you need into your own nexassure.yml. Secrets stay in the
+# environment; nothing here is sensitive.
+version: 1
+project: connection-examples
+
+metastore:
+  # Shared history for a team. Omit entirely to use a local SQLite file.
+  # url: postgresql+psycopg://nexassure:${env:METASTORE_PASSWORD}@metastore.internal:5432/nexassure
+  auto_discover: true
+  discovery_limit: 200
+  retention_days: 90
+
+connections:
+  # ----------------------------------------------------------- Snowflake --
+  - name: snowflake_prod
+    type: snowflake
+    description: Production Snowflake, read-only role.
+    account: ${env:SNOWFLAKE_ACCOUNT}          # e.g. xy12345.eu-west-1
+    username: ${env:SNOWFLAKE_USER}
+    password: ${env:SNOWFLAKE_PASSWORD}
+    warehouse: ANALYTICS_WH
+    database: PROD
+    schema: PUBLIC
+    role: DATA_QUALITY_READER
+    query_timeout: 900
+    tags: [production]
+    # Key-pair auth instead of a password. The passphrase comes from
+    # SNOWFLAKE_PRIVATE_KEY_PASSPHRASE so it never lands in a file.
+    # private_key_path: /secrets/snowflake_key.p8
+    #
+    # SSO instead of a password:
+    # authenticator: externalbrowser
+
+  # ---------------------------------------------------------- PostgreSQL --
+  - name: postgres_prod
+    type: postgres
+    host: ${env:PGHOST}
+    port: 5432
+    database: analytics
+    schema: public
+    username: ${env:PGUSER}
+    password: ${env:PGPASSWORD}
+    params:
+      sslmode: require
+    tags: [production]
+
+  # ---------------------------------------------------------- SQL Server --
+  - name: mssql_prod
+    type: mssql
+    host: sqlserver.example.com
+    port: 1433
+    database: Analytics
+    schema: dbo
+    username: ${env:MSSQL_USER}
+    password: ${env:MSSQL_PASSWORD}
+    # Auto-detected from the installed ODBC drivers when omitted.
+    driver: ODBC Driver 18 for SQL Server
+    params:
+      Encrypt: "yes"
+      # Driver 18 rejects self-signed certs by default, which most on-prem
+      # instances use. Set this to "no" for Azure SQL.
+      TrustServerCertificate: "yes"
+
+  # ------------------------------------------------------- Azure Synapse --
+  - name: synapse_prod
+    type: synapse
+    host: myworkspace.sql.azuresynapse.net
+    port: 1433
+    database: analytics_pool
+    schema: dbo
+    username: ${env:SYNAPSE_USER}
+    password: ${env:SYNAPSE_PASSWORD}
+    # Azure AD instead of a SQL login:
+    # authenticator: ActiveDirectoryMsi
+
+  # ------------------------------------------------------------ Redshift --
+  - name: redshift_prod
+    type: redshift
+    host: cluster.abc123.eu-west-1.redshift.amazonaws.com
+    port: 5439
+    database: analytics
+    schema: public
+    username: ${env:REDSHIFT_USER}
+    password: ${env:REDSHIFT_PASSWORD}
+
+  # -------------------------------------------------------------- Oracle --
+  - name: oracle_prod
+    type: oracle
+    host: oracle.example.com
+    port: 1521
+    service_name: ORCLPDB1
+    schema: ANALYTICS
+    username: ${env:ORACLE_USER}
+    password: ${env:ORACLE_PASSWORD}
+
+  # --------------------------------------------------------------- MySQL --
+  - name: mysql_prod
+    type: mysql
+    host: mysql.example.com
+    port: 3306
+    database: analytics
+    username: ${env:MYSQL_USER}
+    password: ${env:MYSQL_PASSWORD}
+
+  # ---------------------------------------------- Local, for development --
+  - name: local
+    type: duckdb
+    database: ./warehouse.duckdb
+    schema: main
+
+  # ------------------------------------- Anything, via a SQLAlchemy URL --
+  - name: from_url
+    type: postgres
+    dsn: ${env:DATABASE_URL}
+
+suites:
+  - suites/**/*.yml
+
+defaults:
+  max_parallel: 8
+  fail_fast: false
+
+notifications:
+  notify_on: failure
+  # slack_webhook: ${env:SLACK_WEBHOOK_URL}
+  # webhook_url: ${env:PAGERDUTY_WEBHOOK}

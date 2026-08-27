@@ -1,0 +1,202 @@
+# The quickstart suite.
+#
+# Every check carries a description explaining what breaks when it fails.
+# That description is what shows up in the report, in Slack, and in the MCP
+# response an agent reads - so it is worth writing properly.
+#
+#   nexassure run warehouse_quality
+name: warehouse_quality
+connection: demo
+description: Contract for the demo warehouse - customers and orders.
+owner: data-platform@example.com
+
+# Uncomment to have `nexassure schedule run` fire this every morning at 06:00 UTC.
+# schedule: "0 6 * * *"
+
+defaults:
+  schema: main
+  severity: error
+  owner: data-platform@example.com
+
+checks:
+  # ------------------------------------------------------------------ keys --
+  - name: customer_id_is_the_key
+    type: primary_key
+    description: >
+      customer_id joins to every downstream mart. A duplicate double-counts
+      revenue; a NULL drops the row from every inner join.
+    dataset: customers
+    column: customer_id
+    tags: [uniqueness, critical]
+
+  - name: order_id_is_unique
+    type: unique
+    description: Two orders sharing an id means the loader replayed a batch.
+    dataset: orders
+    column: order_id
+    tags: [uniqueness, critical]
+
+  # ---------------------------------------------------------- completeness --
+  - name: orders_always_have_a_customer
+    type: not_null
+    description: An order with no customer cannot be attributed to a region or a rep.
+    dataset: orders
+    column: customer_id
+    tags: [completeness]
+
+  - name: customer_email_is_present
+    type: not_blank
+    description: >
+      Marketing sends on this column, so an empty string is as broken as a NULL.
+      Tolerating 1% while the CRM backfill lands.
+    dataset: customers
+    column: email
+    threshold: 0.01
+    tags: [completeness]
+
+  # --------------------------------------------------------------- volume --
+  - name: orders_volume_is_plausible
+    type: row_count
+    description: >
+      The daily load normally leaves well over 500 orders. Far fewer means a
+      partial load; far more means a duplicated batch.
+    dataset: orders
+    params:
+      min: 500
+      max: 100000
+    tags: [volume]
+
+  - name: customers_not_empty
+    type: not_empty
+    description: An empty customers table means the extract failed silently.
+    dataset: customers
+    tags: [volume]
+
+  # -------------------------------------------------------------- validity --
+  - name: order_status_is_a_known_state
+    type: accepted_values
+    description: >
+      The BI layer has a hardcoded mapping for these four states. Anything else
+      renders as a blank row in the executive dashboard.
+    dataset: orders
+    column: status
+    params:
+      values: [pending, shipped, delivered, cancelled]
+    tags: [validity]
+
+  - name: customer_region_is_a_known_region
+    type: accepted_values
+    description: Regional revenue splits silently drop rows in unknown regions.
+    dataset: customers
+    column: region
+    params:
+      values: [emea, namer, apac, latam]
+    tags: [validity]
+
+  - name: order_totals_are_never_negative
+    type: range
+    description: A refund belongs in the refunds table, not as a negative order.
+    dataset: orders
+    column: total
+    params:
+      min: 0
+    tags: [validity]
+
+  - name: email_looks_like_an_email
+    type: regex
+    description: A malformed address is a bounce, and bounces cost sender reputation.
+    dataset: customers
+    column: email
+    params:
+      pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    severity: warn
+    tags: [validity]
+
+  # ----------------------------------------------------------- consistency --
+  - name: orders_reference_real_customers
+    type: referential_integrity
+    description: >
+      No foreign key is enforced in the warehouse, so orphaned orders are the
+      single most common defect here. Each one silently vanishes from any
+      customer-joined report.
+    dataset: orders
+    column: customer_id
+    params:
+      to: customers
+      field: customer_id
+    tags: [consistency, critical]
+
+  - name: orders_schema_is_stable
+    type: schema
+    description: Downstream models select these columns by name; a rename breaks them.
+    dataset: orders
+    params:
+      columns:
+        - name: order_id
+          type: varchar
+        - name: customer_id
+        - name: status
+        - name: total
+        - name: created_at
+    tags: [consistency]
+
+  # ------------------------------------------------------------ timeliness --
+  - name: orders_are_fresh
+    type: freshness
+    description: >
+      The hourly pipeline is considered late once the newest order is more than
+      six hours old.
+    dataset: orders
+    column: created_at
+    params:
+      max_age_hours: 6
+    tags: [timeliness]
+
+  # --------------------------------------------- business rules, as SQL ----
+  - name: cancelled_orders_are_a_small_minority
+    type: custom_sql
+    description: >
+      A cancellation rate above 40% has always meant a checkout bug rather than
+      a change in customer behaviour.
+    query: |
+      SELECT CAST(SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS DOUBLE)
+             / NULLIF(COUNT(*), 0)
+      FROM main.orders
+    expect:
+      operator: lte
+      value: 0.4
+    tags: [business-rule]
+
+  - name: no_orders_dated_in_the_future
+    type: sql_returns_no_rows
+    description: >
+      A future-dated order means the loader wrote a local timestamp instead of
+      UTC. Every returned row is one bad record.
+    query: |
+      SELECT order_id, created_at
+      FROM main.orders
+      WHERE created_at > CURRENT_TIMESTAMP + INTERVAL 1 HOUR
+    tags: [business-rule, timeliness]
+
+  - name: every_region_reports
+    type: custom_sql
+    description: >
+      All four regions must appear. A missing region means that partition
+      failed to load, which is invisible in a simple row count.
+    query: SELECT DISTINCT region FROM main.customers WHERE region IN ('emea','namer','apac','latam')
+    expect:
+      shape: column
+      operator: set_equals
+      value: [emea, namer, apac, latam]
+    tags: [business-rule]
+
+  # --------------------------------------- an expensive check, gated -------
+  - name: orders_have_no_duplicate_rows
+    type: no_duplicate_rows
+    description: >
+      A full GROUP BY across every column. Gated behind the row count check,
+      because scanning an empty table proves nothing and still costs money.
+    dataset: orders
+    depends_on: [orders_volume_is_plausible]
+    severity: warn
+    tags: [uniqueness, expensive]
