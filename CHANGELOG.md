@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-28
+
+### Fixed
+
+- `--json` output is now plain, pipeable JSON. It previously rendered through
+  Rich, which colourises and re-wraps, so `nexassure connectors --json | jq`
+  received ANSI escape codes and failed to parse.
+
+### Changed
+
+- Sumit Kumar Gupta and Nitish Pradhan are credited as authors in the package
+  metadata, `NOTICE`, `AUTHORS.md`, the README and the documentation.
+
+### Added
+
+- Release workflow publishing to PyPI via Trusted Publishing (OIDC), so no API
+  token is stored anywhere.
+- MkDocs Material documentation site.
+
+
 ## [0.1.0] - 2026-08-27
 
 First public release.
@@ -39,5 +59,6 @@ First public release.
 - **Read-only SQL guard** applied to every user- and agent-supplied statement.
 - **Notifications** to Slack and generic webhooks.
 
-[Unreleased]: https://github.com/sumit-gupta03/nexassure/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sumit-gupta03/nexassure/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/sumit-gupta03/nexassure/releases/tag/v0.1.1
 [0.1.0]: https://github.com/sumit-gupta03/nexassure/releases/tag/v0.1.0
