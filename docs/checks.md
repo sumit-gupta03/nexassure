@@ -539,6 +539,6 @@ dropped. Cycles are caught by `nexassure validate`, offline.
 
 ## Adding your own
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md#adding-a-check-type). Most check types
+See [CONTRIBUTING.md](https://github.com/sumit-gupta03/nexassure/blob/main/CONTRIBUTING.md#adding-a-check-type). Most check types
 are a few lines, because `RowPredicateCheck` already handles counting and
 sampling failing rows.

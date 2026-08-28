@@ -9,6 +9,7 @@ Exit codes are part of the published contract, so they are asserted explicitly:
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from typer.testing import CliRunner
@@ -20,14 +21,21 @@ pytestmark = pytest.mark.integration
 runner = CliRunner()
 
 
-@pytest.fixture(autouse=True)
-def wide_terminal(monkeypatch):
-    """Give Rich a wide terminal.
+#: Rich emits SGR colour codes; CI sets FORCE_COLOR, a developer terminal may too.
+_ANSI = re.compile(r"\[[0-9;]*[A-Za-z]")
 
-    CliRunner is not a TTY, so Rich falls back to 80 columns and truncates table
-    cells - which would make assertions about rendered text fail for reasons
-    that have nothing to do with the code under test.
+
+@pytest.fixture(autouse=True)
+def plain_wide_terminal(monkeypatch):
+    """Make rendered output deterministic.
+
+    CliRunner is not a TTY, so Rich falls back to 80 columns and wraps table
+    cells; CI additionally sets FORCE_COLOR, so the output carries ANSI escapes.
+    Neither has anything to do with the code under test, so both are neutralised
+    here - and `displays` below stays tolerant of whatever wrapping survives.
     """
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    monkeypatch.setenv("NO_COLOR", "1")
     monkeypatch.setenv("COLUMNS", "220")
     monkeypatch.setenv("TERM", "dumb")
 
@@ -36,23 +44,34 @@ def invoke(*args: str):
     return runner.invoke(app, list(args))
 
 
+def displays(result, *needles: str) -> bool:
+    """Whether every needle appears in the output, ignoring colour and wrapping.
+
+    Rich may break `lifetime_value` across two lines as `lifetime_` + `value`,
+    which is correct rendering but breaks a naive substring check. Whitespace is
+    stripped from both sides so the assertion tests content, not layout.
+    """
+    haystack = re.sub(r"\s+", "", _ANSI.sub("", result.stdout))
+    return all(re.sub(r"\s+", "", needle) in haystack for needle in needles)
+
+
 class TestMeta:
     def test_version(self):
         result = invoke("version")
         assert result.exit_code == EXIT_OK
-        assert "nexassure" in result.stdout
+        assert displays(result, "nexassure")
 
     def test_help_lists_the_main_commands(self):
         result = invoke("--help")
         assert result.exit_code == EXIT_OK
         for command in ("run", "profile", "suggest", "validate", "mcp", "serve"):
-            assert command in result.stdout
+            assert displays(result, command)
 
     def test_connectors_lists_every_supported_engine(self):
         result = invoke("connectors")
         assert result.exit_code == EXIT_OK
         for engine in ("snowflake", "postgres", "mssql", "redshift", "synapse", "oracle"):
-            assert engine in result.stdout
+            assert displays(result, engine)
 
     def test_connectors_as_json(self):
         result = invoke("connectors", "--json")
@@ -87,7 +106,7 @@ class TestConnectionCommands:
             "test-connection", "test_warehouse", "-c", str(project_dir / "nexassure.yml")
         )
         assert result.exit_code == EXIT_OK
-        assert "OK" in result.stdout
+        assert displays(result, "OK")
 
     def test_test_connection_needs_a_target(self, project_dir):
         result = invoke("test-connection", "-c", str(project_dir / "nexassure.yml"))
@@ -100,12 +119,12 @@ class TestConnectionCommands:
     def test_tables(self, project_dir):
         result = invoke("tables", "test_warehouse", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "main.customers" in result.stdout
+        assert displays(result, "main.customers")
 
     def test_discover_populates_the_catalog(self, project_dir):
         result = invoke("discover", "test_warehouse", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "Registered" in result.stdout
+        assert displays(result, "Registered")
 
         listed = invoke("metastore", "catalog", "-c", str(project_dir / "nexassure.yml"))
         assert listed.exit_code == EXIT_OK
@@ -122,7 +141,7 @@ class TestQuery:
             str(project_dir / "nexassure.yml"),
         )
         assert result.exit_code == EXIT_OK
-        assert "7" in result.stdout
+        assert displays(result, "7")
 
     def test_write_query_is_refused(self, project_dir):
         result = invoke(
@@ -141,8 +160,8 @@ class TestProfile:
             "profile", "test_warehouse", "main.customers", "-c", str(project_dir / "nexassure.yml")
         )
         assert result.exit_code == EXIT_OK
-        assert "customers" in result.stdout
-        assert "lifetime_value" in result.stdout
+        assert displays(result, "customers")
+        assert displays(result, "lifetime_value")
 
     def test_writes_json_output(self, project_dir, tmp_path):
         target = tmp_path / "profile.json"
@@ -191,7 +210,7 @@ class TestValidate:
     def test_a_good_project_validates(self, project_dir):
         result = invoke("validate", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "Valid" in result.stdout
+        assert displays(result, "Valid")
 
     def test_a_broken_suite_exits_two(self, project_dir):
         (project_dir / "suites" / "broken.yml").write_text(
@@ -201,14 +220,14 @@ class TestValidate:
         )
         result = invoke("validate", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_TOOL_ERROR
-        assert "unknown check type" in result.stdout
+        assert displays(result, "unknown check type")
 
 
 class TestRun:
     def test_a_failing_suite_exits_one(self, project_dir):
         result = invoke("run", "orders_quality", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_CHECKS_FAILED
-        assert "FAILED" in result.stdout
+        assert displays(result, "FAILED")
 
     def test_a_passing_selection_exits_zero(self, project_dir):
         result = invoke(
@@ -262,17 +281,17 @@ class TestHistoryAndMetastore:
         invoke("run", "orders_quality", "-c", str(project_dir / "nexassure.yml"))
         result = invoke("history", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "orders_quality" in result.stdout
+        assert displays(result, "orders_quality")
 
     def test_metastore_info(self, project_dir):
         result = invoke("metastore", "info", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "Metastore" in result.stdout
+        assert displays(result, "Metastore")
 
     def test_metastore_sync(self, project_dir):
         result = invoke("metastore", "sync", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "Synced" in result.stdout
+        assert displays(result, "Synced")
 
     def test_purge_requires_confirmation(self, project_dir):
         result = invoke("metastore", "purge", "-c", str(project_dir / "nexassure.yml"))
@@ -283,7 +302,7 @@ class TestSchedule:
     def test_list_with_no_schedules(self, project_dir):
         result = invoke("schedule", "list", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "No suite" in result.stdout
+        assert displays(result, "No suite")
 
     def test_list_shows_a_scheduled_suite(self, project_dir):
         path = project_dir / "suites" / "orders.yml"
@@ -295,7 +314,7 @@ class TestSchedule:
         )
         result = invoke("schedule", "list", "-c", str(project_dir / "nexassure.yml"))
         assert result.exit_code == EXIT_OK
-        assert "0 6 * * *" in result.stdout
+        assert displays(result, "0 6 * * *")
 
     def test_scheduler_refuses_to_start_with_nothing_to_run(self, project_dir):
         result = invoke("schedule", "run", "-c", str(project_dir / "nexassure.yml"))

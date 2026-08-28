@@ -4,9 +4,11 @@
 
 **Open-source data testing and profiling for the modern warehouse — with a built-in MCP server.**
 
+[![PyPI](https://img.shields.io/pypi/v/nexassure.svg)](https://pypi.org/project/nexassure/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org)
 [![CI](https://github.com/sumit-gupta03/nexassure/actions/workflows/ci.yml/badge.svg)](https://github.com/sumit-gupta03/nexassure/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-sumit--gupta03.github.io%2Fnexassure-blue)](https://sumit-gupta03.github.io/nexassure/)
 
 </div>
 

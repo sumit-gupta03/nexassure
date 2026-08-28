@@ -1,0 +1,136 @@
+name: Release
+
+# Publishes to PyPI when a version tag is pushed:
+#
+#   git tag -a v0.1.0 -m "NexAssure 0.1.0" && git push origin v0.1.0
+#
+# Authentication uses PyPI Trusted Publishing (OpenID Connect). There is no API
+# token stored in this repository and none is needed: PyPI verifies the identity
+# of this exact workflow, in this exact repository, and mints a short-lived
+# credential for the upload. A leaked repo secret cannot be used to publish,
+# because there is no secret.
+#
+# One-time setup on PyPI (https://pypi.org/manage/account/publishing/):
+#   PyPI project name : nexassure
+#   Owner             : sumit-gupta03
+#   Repository name   : nexassure
+#   Workflow name     : release.yml
+#   Environment name  : pypi
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to publish
+        required: true
+        default: testpypi
+        type: choice
+        options: [testpypi, pypi]
+
+permissions:
+  contents: read
+
+jobs:
+  # Never publish something the test suite has not passed. This duplicates a
+  # slice of CI deliberately: a tag can be pushed to a commit CI never ran on.
+  verify:
+    name: Verify before publishing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev,duckdb,mcp,server,notify]"
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+      - run: pytest -q
+
+  build:
+    name: Build distributions
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install build twine
+      - run: python -m build
+      - name: Check metadata renders on PyPI
+        run: twine check --strict dist/*
+      - name: Confirm the tag matches the packaged version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          packaged=$(python -c "import re,pathlib; \
+            print(re.search(r'__version__ = \"([^\"]+)\"', \
+            pathlib.Path('src/nexassure/version.py').read_text()).group(1))")
+          echo "tag=$tag packaged=$packaged"
+          test "$tag" = "$packaged"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/nexassure
+    permissions:
+      id-token: write        # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  pypi:
+    name: Publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/nexassure
+    permissions:
+      id-token: write        # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Attach distributions to the GitHub release
+    needs: pypi
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "NexAssure $GITHUB_REF_NAME" \
+            --notes "See [CHANGELOG.md](https://github.com/sumit-gupta03/nexassure/blob/main/CHANGELOG.md)." \
+            --verify-tag

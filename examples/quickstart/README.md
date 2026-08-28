@@ -75,7 +75,7 @@ nexassure mcp --config "$(pwd)/nexassure.yml"
 
 Then ask your assistant *"what data quality problems does the orders table
 have?"* and watch it profile, hypothesise and verify — read-only throughout.
-See [docs/mcp.md](../../docs/mcp.md).
+See [docs/mcp.md](https://sumit-gupta03.github.io/nexassure/mcp/).
 
 ## Files
 

@@ -144,7 +144,7 @@ trailing statement is the classic way to smuggle a write past a leading
 `SELECT`. An agent cannot drop a table through this server.
 
 **This is defence in depth, not the boundary.** Point the server at a database
-role that only holds `SELECT`. See [SECURITY.md](../SECURITY.md).
+role that only holds `SELECT`. See [SECURITY.md](https://github.com/sumit-gupta03/nexassure/blob/main/SECURITY.md).
 
 **Bounded output.** Queries cap at 200 rows, profiles at 200 columns, and long
 values are truncated with a note. One tool call cannot flood a context window,

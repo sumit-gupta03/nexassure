@@ -155,7 +155,7 @@ rejected and a column named `"drop"` would be unusable — and a guard that
 blocks legitimate reads is worse than no guard, because people turn it off.
 
 It is a keyword screen, not a SQL parser, and it is explicitly not the security
-boundary. See [SECURITY.md](../SECURITY.md).
+boundary. See [SECURITY.md](https://github.com/sumit-gupta03/nexassure/blob/main/SECURITY.md).
 
 ## Extension points
 

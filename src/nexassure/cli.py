@@ -73,6 +73,17 @@ def _open(config: Path | None, verbose: bool = False):
         raise typer.Exit(EXIT_TOOL_ERROR) from exc
 
 
+def _emit_json(payload: object) -> None:
+    """Write machine-readable JSON to stdout.
+
+    Deliberately bypasses Rich. ``console.print_json`` colourises and re-wraps
+    its output, so ``nexassure connectors --json | jq`` would receive ANSI
+    escape codes and fail to parse. Anything behind ``--json`` is for a machine,
+    so it goes out as plain text on stdout.
+    """
+    sys.stdout.write(json.dumps(payload, indent=2, default=str) + "\n")
+
+
 def _fail(exc: Exception, hint: str | None = None) -> None:
     message = exc.message if isinstance(exc, NexAssureError) else str(exc)
     print_error(message, hint)
@@ -136,7 +147,7 @@ def connectors(
 
     rows = [r for r in describe_connectors() if r.get("canonical")]
     if as_json:
-        console.print_json(json.dumps(rows))
+        _emit_json(rows)
         return
 
     table = Table(title="Connectors", header_style="bold")
@@ -167,7 +178,7 @@ def list_checks(
 
     rows = describe_checks()
     if as_json:
-        console.print_json(json.dumps(rows))
+        _emit_json(rows)
         return
 
     table = Table(title="Check types", header_style="bold")
@@ -505,7 +516,7 @@ def query(
             return
 
     if as_json:
-        console.print_json(json.dumps(result.dicts(), default=str))
+        _emit_json(result.dicts())
         return
 
     table = Table(header_style="bold", box=None)

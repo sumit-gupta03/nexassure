@@ -387,7 +387,7 @@ and `VALUES` may lead, write keywords outside string literals are rejected, and
 multi-statement SQL is refused.
 
 This catches mistakes. It is **not** a substitute for permissions — see
-[SECURITY.md](../SECURITY.md). Run NexAssure as a role that only holds `SELECT`.
+[SECURITY.md](https://github.com/sumit-gupta03/nexassure/blob/main/SECURITY.md). Run NexAssure as a role that only holds `SELECT`.
 
 To opt out for one connection:
 
@@ -412,4 +412,4 @@ package with no fork:
 clickhouse = "nexassure_clickhouse:ClickHouseConnector"
 ```
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md#adding-a-warehouse).
+See [CONTRIBUTING.md](https://github.com/sumit-gupta03/nexassure/blob/main/CONTRIBUTING.md#adding-a-warehouse).
