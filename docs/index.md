@@ -135,6 +135,10 @@ nexassure run
 The demo data carries one planted defect per test family, so every failure you
 see is a real one the suite caught.
 
+## Authors
+
+Created and maintained by **Sumit Kumar Gupta** ([@sumit-gupta03](https://github.com/sumit-gupta03)) and **Nitish Pradhan**.
+
 ## Licence
 
 [Apache License 2.0](https://github.com/sumit-gupta03/nexassure/blob/main/LICENSE).

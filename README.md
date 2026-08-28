@@ -523,6 +523,12 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Authors
+
+Created and maintained by **Sumit Kumar Gupta** ([@sumit-gupta03](https://github.com/sumit-gupta03)) and **Nitish Pradhan**.
+
+See [AUTHORS.md](AUTHORS.md) for the full list of contributors.
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).

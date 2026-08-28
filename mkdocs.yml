@@ -4,7 +4,7 @@ site_url: https://sumit-gupta03.github.io/nexassure/
 repo_url: https://github.com/sumit-gupta03/nexassure
 repo_name: sumit-gupta03/nexassure
 edit_uri: edit/main/docs/
-copyright: Copyright &copy; 2026 The NexAssure Authors - Apache License 2.0
+copyright: Copyright &copy; 2026 Sumit Kumar Gupta and Nitish Pradhan - Apache License 2.0
 
 theme:
   name: material
